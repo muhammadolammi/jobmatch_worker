@@ -96,7 +96,9 @@ func callAgent(currentSession Session, workerConfig *WorkerConfig) error {
 		})
 		if err != nil {
 			log.Printf("⚠️ Failed to download %s after retries: %v", resume.ObjectKey, err)
+			// aggregateResult(results, "", true, fmt.Sprintf("file download error: %v", err))
 			aggregateResult(results, "", true, "file download error")
+
 			continue
 		}
 
