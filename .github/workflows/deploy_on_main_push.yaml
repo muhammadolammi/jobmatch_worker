@@ -1,0 +1,94 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main  
+
+env:
+  gpgkey: ${{ secrets.GPG_KEY }}
+
+permissions:
+  checks: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  build:
+    name: Build and push Docker images
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+
+      - name: Build the server binary
+        run: |
+          chmod +x ./build.sh
+          ./build.sh
+          docker --version
+
+      - name: Set version to Git env
+        run: echo "DEPLOY_VERSION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Build new Docker image
+        run: |
+          docker build . \
+            -t muhammadolammi/jobmatch-worker:latest \
+            -t muhammadolammi/jobmatch-worker:${{ env.DEPLOY_VERSION }}
+          docker image ls 
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push Docker images
+        run: docker push muhammadolammi/jobmatch-worker --all-tags
+
+  deploy:
+    needs: build
+    name: Deploy to host
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Decrypt SSH key
+        run: |
+          mkdir secrets
+          gpg --quiet --batch --yes --decrypt \
+            --passphrase="$gpgkey" \
+            --output secrets/key.pem key.pem.gpg
+          chmod 400 secrets/key.pem
+
+      - name: Pull Docker image on droplet
+        run: |
+          ssh -o StrictHostKeyChecking=no -i secrets/key.pem ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} \
+            'sudo docker pull muhammadolammi/jobmatch-worker:latest'
+
+      - name: Restart Docker container
+        run: |
+          ssh -o StrictHostKeyChecking=no -i secrets/key.pem ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} <<'EOF'
+          sudo docker stop worker || true
+          sudo docker rm worker || true
+          sudo docker run -d \
+            --network main \
+            --name worker \
+            -e DB_URL='${{ secrets.DB_URL }}' \
+            -e RABBITMQ_URL='${{ secrets.RABBITMQ_URL }}' \
+            -e R2_ACCCOUNT_ID='${{ secrets.R2_ACCCOUNT_ID }}' \
+            -e R2_BUCKET='${{ secrets.R2_BUCKET }}' \
+            -e R2_SECRET_KEY='${{ secrets.R2_SECRET_KEY }}' \
+            -e R2_ACCESS_KEY='${{ secrets.R2_ACCESS_KEY }}' \
+            -e GOOGLE_API_KEY='${{ secrets.GOOGLE_API_KEY }}' \
+            muhammadolammi/jobmatch-worker:latest
+          EOF
