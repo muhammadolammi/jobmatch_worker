@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/joho/godotenv"
 	"github.com/muhammadolammi/jobmatchworker/internal/database"
+	"github.com/streadway/amqp"
 	"google.golang.org/adk/runner"
 	"google.golang.org/adk/session"
 )
@@ -64,7 +65,6 @@ func main() {
 		log.Fatal("error creating aws config", err)
 	}
 
-	sessionBroadcaster := NewBroadcaster()
 	googleApiKey := os.Getenv("GOOGLE_API_KEY")
 	if googleApiKey == "" {
 		log.Fatal("empty GOOGLE_API_KEY in env")
@@ -92,6 +92,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create runner: %v", err)
 	}
+	conn, err := amqp.Dial(rabbitmqUrl)
+	if err != nil {
+		log.Fatalf("error connecting to RabbitMQ. err:  %v", err)
+
+	}
 	//  update config agent runner.
 	workerConfig := WorkerConfig{
 		AgentName:           agentName,
@@ -99,10 +104,10 @@ func main() {
 		AgentSessionService: inMemoryService,
 		DB:                  dbqueries,
 		// GoogleApiKey:        googleApiKey,
-		R2:                 &r2Config,
-		AwsConfig:          &awsConfig,
-		RABBITMQUrl:        rabbitmqUrl,
-		SessionBroadcaster: sessionBroadcaster,
+		R2:          &r2Config,
+		AwsConfig:   &awsConfig,
+		RABBITMQUrl: rabbitmqUrl,
+		RabbitConn:  conn,
 	}
 
 	fmt.Println("Starting 3 workers consumer pool ")

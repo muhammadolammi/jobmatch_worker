@@ -38,7 +38,6 @@ func retry[T any](attempts int, fn func() (T, error)) (T, error) {
 
 func aggregateResult(results *AnalysesResults, resultStr string, hasError bool, errorMsg string) {
 	result := AnalysesResult{}
-
 	switch {
 	case hasError:
 		result.IsErrorResult = true
@@ -153,7 +152,7 @@ func callAgent(currentSession Session, workerConfig *WorkerConfig) error {
 			aggregateResult(results, finalOutput, false, "")
 		}
 	}
-	log.Println("session id" + agentSession.Session.ID())
+	log.Println("session id: " + agentSession.Session.ID() + " analyzed")
 	// Clean up the session.
 	err = workerConfig.AgentSessionService.Delete(ctx, &session.DeleteRequest{
 		AppName:   agentSession.Session.AppName(),
@@ -235,43 +234,74 @@ func worker(id int, workerConfig *WorkerConfig, wg *sync.WaitGroup) {
 				Status: "failed",
 				ID:     session.ID,
 			})
+			update := map[string]any{
+				"session_id": session.ID,
+				"status":     "failed",
+				"message":    "analysis failed",
+				"timestamp":  time.Now(),
+			}
+			err := publishSessionUpdate(workerConfig.RabbitConn, session.ID.String(), update)
+			if err != nil {
+				log.Println("failed to publish update:", err)
+			}
+
 			continue
 		}
 		log.Printf("Worker %d processing session. session_id: %s", id+1, session.ID)
-		update := map[string]interface{}{
-			"status":    "processing",
-			"timestamp": time.Now(),
-			"message":   "analysis started",
+
+		update := map[string]any{
+			"session_id": session.ID,
+			"status":     "processing",
+			"message":    "analysis started",
+			"timestamp":  time.Now(),
 		}
-		data, _ := json.Marshal(update)
-		workerConfig.SessionBroadcaster.Broadcast(session.ID.String(), string(data))
+		err := publishSessionUpdate(workerConfig.RabbitConn, session.ID.String(), update)
+		if err != nil {
+			log.Println("failed to publish update:", err)
+		}
+		workerConfig.DB.UpdateSessionStatus(context.Background(), database.UpdateSessionStatusParams{
+			Status: "processing",
+			ID:     session.ID,
+		})
 
 		err = callAgent(session, workerConfig)
 
 		if err != nil {
 			log.Printf("error running agent for session_id: %v. err: %v", session.ID, err)
-			update := map[string]interface{}{
-				"status": "failed",
-			}
-			data, _ := json.Marshal(update)
-			workerConfig.SessionBroadcaster.Broadcast(session.ID.String(), string(data))
+
 			// update session status as failed
 			workerConfig.DB.UpdateSessionStatus(context.Background(), database.UpdateSessionStatusParams{
 				Status: "failed",
 				ID:     session.ID,
 			})
+			update := map[string]any{
+				"session_id": session.ID,
+				"status":     "failed",
+				"message":    "analysis failed",
+				"timestamp":  time.Now(),
+			}
+			err := publishSessionUpdate(workerConfig.RabbitConn, session.ID.String(), update)
+			if err != nil {
+				log.Println("failed to publish update:", err)
+			}
 			continue
 		}
 		// update session status
-		update = map[string]interface{}{
-			"status": "completed",
-		}
-		data, _ = json.Marshal(update)
-		workerConfig.SessionBroadcaster.Broadcast(session.ID.String(), string(data))
+
 		workerConfig.DB.UpdateSessionStatus(context.Background(), database.UpdateSessionStatusParams{
 			Status: "completed",
 			ID:     session.ID,
 		})
+		update = map[string]any{
+			"session_id": session.ID,
+			"status":     "completed",
+			"message":    "analysis completed",
+			"timestamp":  time.Now(),
+		}
+		err = publishSessionUpdate(workerConfig.RabbitConn, session.ID.String(), update)
+		if err != nil {
+			log.Println("failed to publish update:", err)
+		}
 		// if err != nil {
 		// 	log.Printf("error updating session status in db to completed for  session_id: %v. err: %v", session.ID, err)
 		// 	continue

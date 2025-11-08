@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/google/uuid"
 	"github.com/muhammadolammi/jobmatchworker/internal/database"
+	"github.com/streadway/amqp"
 	"google.golang.org/adk/runner"
 	"google.golang.org/adk/session"
 )
@@ -22,8 +23,8 @@ type WorkerConfig struct {
 	// GoogleApiKey        string
 	R2                  *R2Config
 	AwsConfig           *aws.Config
+	RabbitConn          *amqp.Connection
 	RABBITMQUrl         string
-	SessionBroadcaster  *Broadcaster
 	AgentRunner         *runner.Runner
 	AgentSessionService session.Service
 	AgentName           string
