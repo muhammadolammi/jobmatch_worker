@@ -67,10 +67,6 @@ jobs:
           region: ${{ env.REGION }}
           project_id: ${{ env.PROJECT_ID }}
           image: index.docker.io/${{ env.IMAGE }}:latest
-          flags: >
-            --no-allow-unauthenticated
-            --concurrency=1
-            --memory=1Gi
           env_vars: |
             PROJECT_ID=${{ env.PROJECT_ID }}
             DB_URL=${{ secrets.DB_URL }}
