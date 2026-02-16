@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
 	"os"
 
@@ -23,6 +22,14 @@ func main() {
 		log.Fatal("empty DB_URL in environment")
 	}
 
+	clientApiKey := os.Getenv("CLIENT_API_KEY")
+	if clientApiKey == "" {
+		log.Fatal("empty CLIENT_API_KEY in environment")
+	}
+	port := os.Getenv("PORT")
+	if port == "" {
+		log.Fatal("empty PORT in environment")
+	}
 	rabbitmqUrl := os.Getenv("RABBITMQ_URL")
 	if rabbitmqUrl == "" {
 		log.Fatal("empty RABBITMQ_URL in env")
@@ -104,12 +111,15 @@ func main() {
 		AgentSessionService: inMemoryService,
 		DB:                  dbqueries,
 		// GoogleApiKey:        googleApiKey,
-		R2:          &r2Config,
-		AwsConfig:   &awsConfig,
-		RABBITMQUrl: rabbitmqUrl,
-		RabbitConn:  conn,
+		R2:           &r2Config,
+		AwsConfig:    &awsConfig,
+		RABBITMQUrl:  rabbitmqUrl,
+		RabbitConn:   conn,
+		ClientApiKey: clientApiKey,
+		Port:         port,
 	}
 
-	fmt.Println("Starting 3 workers consumer pool ")
-	workerConfig.StartConsumerWorkerPool(3)
+	// fmt.Println("Starting 3 workers consumer pool ")
+	// workerConfig.StartConsumerWorkerPool(3)
+	server(&workerConfig)
 }
