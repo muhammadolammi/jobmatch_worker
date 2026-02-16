@@ -10,8 +10,7 @@ env:
   PROJECT_ID: 'n3xtbridge'
   REGION: 'us-east1'
   IMAGE: 'muhammadolammi/jobmatch-worker'
-  WIF_SERVICE_ACCOUNT: 'github-deployer@n3xtbridge.iam.gserviceaccount.com'
-  WIF_PROVIDER: 'projects/755404739186/locations/global/workloadIdentityPools/github/providers/my-repo'
+  
 
 
 permissions:
@@ -57,8 +56,8 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ env.WIF_PROVIDER }}
-          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
       - name: Deploy to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v2
