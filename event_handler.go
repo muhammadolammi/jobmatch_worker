@@ -71,7 +71,7 @@ func processSession(ctx context.Context, workerConfig *WorkerConfig, sessionUUID
 func handleEvent(w http.ResponseWriter, r *http.Request, workerConfig *WorkerConfig) {
 	ctx := r.Context()
 
-	var event struct {
+	var cloudEvent struct {
 		Data struct {
 			Message struct {
 				Data string `json:"data"`
@@ -79,24 +79,24 @@ func handleEvent(w http.ResponseWriter, r *http.Request, workerConfig *WorkerCon
 		} `json:"data"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&cloudEvent); err != nil {
 		log.Println("Invalid event:", err)
 		http.Error(w, "invalid event", http.StatusBadRequest)
 		return
 	}
 
-	// Decode base64 Pub/Sub payload
-	msgBytes, err := base64.StdEncoding.DecodeString(event.Data.Message.Data)
+	msgBytes, err := base64.StdEncoding.DecodeString(cloudEvent.Data.Message.Data)
 	if err != nil {
 		log.Println("Base64 decode failed:", err)
 		http.Error(w, "invalid message", http.StatusBadRequest)
 		return
 	}
 
-	var payload struct {
+	type Payload struct {
 		SessionID string `json:"session_id"`
 	}
 
+	var payload Payload
 	if err := json.Unmarshal(msgBytes, &payload); err != nil {
 		log.Println("Invalid payload:", err)
 		http.Error(w, "invalid payload", http.StatusBadRequest)
