@@ -6,15 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
-	"net/http"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/ledongthuc/pdf"
-	"github.com/muhammadolammi/jobmatchworker/internal/database"
 	"github.com/nguyenthenguyen/docx"
 	"github.com/streadway/amqp"
 )
@@ -140,77 +136,4 @@ func publishSessionUpdate(rabbitConn *amqp.Connection, sessionID string, update 
 			Body:        body,
 		},
 	)
-}
-
-func RespondWithJson(w http.ResponseWriter, code int, payload interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	data, err := json.Marshal(payload)
-	if err != nil {
-		log.Printf("error marshalling payload to data %v", err)
-		w.WriteHeader(500)
-	}
-	w.WriteHeader(code)
-	_, err = w.Write(data)
-	if err != nil {
-		log.Printf("error writing data to response %v", err)
-		w.WriteHeader(500)
-	}
-}
-
-func RespondWithError(w http.ResponseWriter, code int, message string) {
-	RespondWithJson(w, code, map[string]string{"error": message})
-
-}
-
-func processSession(session Session, config WorkerConfig) {
-	ctx := context.Background()
-	sessionIDStr := session.ID.String()
-
-	// 1. Mark as Processing
-	log.Printf("Processing session_id: %s", sessionIDStr)
-	config.DB.UpdateSessionStatus(ctx, database.UpdateSessionStatusParams{
-		Status: "processing",
-		ID:     session.ID,
-	})
-
-	update := map[string]any{
-		"session_id": session.ID,
-		"status":     "processing",
-		"message":    "analysis started",
-		"timestamp":  time.Now(),
-	}
-	// We use the existing RabbitConn in your config to send SSE updates
-	publishSessionUpdate(config.RabbitConn, sessionIDStr, update)
-
-	// 2. Call the Agent/Analyzer
-	err := callAgent(session, &config)
-	if err != nil {
-		log.Printf("error running agent for session_id: %v. err: %v", session.ID, err)
-
-		config.DB.UpdateSessionStatus(ctx, database.UpdateSessionStatusParams{
-			Status: "failed",
-			ID:     session.ID,
-		})
-
-		publishSessionUpdate(config.RabbitConn, sessionIDStr, map[string]any{
-			"session_id": session.ID,
-			"status":     "failed",
-			"message":    "analysis failed",
-			"timestamp":  time.Now(),
-		})
-		return
-	}
-
-	// 3. Mark as Completed
-	config.DB.UpdateSessionStatus(ctx, database.UpdateSessionStatusParams{
-		Status: "completed",
-		ID:     session.ID,
-	})
-
-	publishSessionUpdate(config.RabbitConn, sessionIDStr, map[string]any{
-		"session_id": session.ID,
-		"status":     "completed",
-		"message":    "analysis completed",
-		"timestamp":  time.Now(),
-	})
 }

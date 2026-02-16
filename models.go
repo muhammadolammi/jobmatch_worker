@@ -28,8 +28,6 @@ type WorkerConfig struct {
 	AgentRunner         *runner.Runner
 	AgentSessionService session.Service
 	AgentName           string
-	ClientApiKey        string
-	Port                string
 }
 
 type AnalysesResult struct {
