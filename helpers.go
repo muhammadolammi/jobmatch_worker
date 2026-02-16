@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/ledongthuc/pdf"
+	"github.com/muhammadolammi/jobmatchworker/internal/database"
 	"github.com/nguyenthenguyen/docx"
 	"github.com/streadway/amqp"
 )
@@ -136,4 +137,17 @@ func publishSessionUpdate(rabbitConn *amqp.Connection, sessionID string, update 
 			Body:        body,
 		},
 	)
+}
+
+func dbSessionToSession(dbSession database.Session) Session {
+	return Session{
+		ID:             dbSession.ID,
+		UserID:         dbSession.UserID,
+		CreatedAt:      dbSession.CreatedAt,
+		Name:           dbSession.Name,
+		Status:         dbSession.Status,
+		JobTitle:       dbSession.JobTitle,
+		JobDescription: dbSession.JobDescription,
+	}
+
 }

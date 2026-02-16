@@ -28,6 +28,7 @@ type WorkerConfig struct {
 	AgentRunner         *runner.Runner
 	AgentSessionService session.Service
 	AgentName           string
+	ProjectID           string
 }
 
 type AnalysesResult struct {

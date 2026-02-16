@@ -18,3 +18,13 @@ type Resume struct {
 	CreatedAt        time.Time
 	SessionID        uuid.UUID
 }
+
+type Session struct {
+	ID             uuid.UUID
+	CreatedAt      time.Time
+	Name           string
+	UserID         uuid.UUID
+	Status         string
+	JobTitle       string
+	JobDescription string
+}

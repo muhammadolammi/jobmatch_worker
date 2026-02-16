@@ -22,6 +22,11 @@ func main() {
 	if dbUrl == "" {
 		log.Fatal("empty DB_URL in environment")
 	}
+	projectId := os.Getenv("PROJECT_ID")
+
+	if projectId == "" {
+		log.Fatal("empty PROJECT_ID in environment")
+	}
 
 	rabbitmqUrl := os.Getenv("RABBITMQ_URL")
 	if rabbitmqUrl == "" {
@@ -110,6 +115,6 @@ func main() {
 		RabbitConn:  conn,
 	}
 
-	fmt.Println("Starting 3 workers consumer pool ")
-	workerConfig.StartConsumerWorkerPool(3)
+	fmt.Println("Starting Worker ")
+	workerConfig.StartWorker()
 }

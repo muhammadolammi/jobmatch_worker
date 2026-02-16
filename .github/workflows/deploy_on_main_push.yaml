@@ -1,48 +1,29 @@
-name: Build and Deploy
+name: Build and Deploy Worker
 
 on:
   push:
     branches:
-      - main  
+      - main
 
 env:
-  gpgkey: ${{ secrets.GPG_KEY }}
+  PROJECT_ID: 'n3xtbridge'
+  REGION: 'us-east1'
+  SERVICE: 'jobmatch-worker'
+  IMAGE: 'muhammadolammi/jobmatch-worker'
+  WIF_SERVICE_ACCOUNT: 'github-deployer@n3xtbridge.iam.gserviceaccount.com'
 
 permissions:
-  checks: write
   contents: read
-  pull-requests: write
+  id-token: write
 
 jobs:
   build:
-    name: Build and push Docker images
+    name: Build and Push Worker Image
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-
-      - name: Build the server binary
-        run: |
-          chmod +x ./build.sh
-          ./build.sh
-          docker --version
-
-      - name: Set version to Git env
-        run: echo "DEPLOY_VERSION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-
-      - name: Build new Docker image
-        run: |
-          docker build . \
-            -t muhammadolammi/jobmatch-worker:latest \
-            -t muhammadolammi/jobmatch-worker:${{ env.DEPLOY_VERSION }}
-          docker image ls 
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -50,45 +31,41 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Push Docker images
-        run: docker push muhammadolammi/jobmatch-worker --all-tags
+      - name: Build and Push Docker image
+        run: |
+          DEPLOY_VERSION=$(git rev-parse --short HEAD)
+          docker build -t $IMAGE:latest -t $IMAGE:$DEPLOY_VERSION .
+          docker push $IMAGE --all-tags
 
   deploy:
     needs: build
-    name: Deploy to host
+    name: Deploy Worker to Cloud Run
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
 
-      - name: Decrypt SSH key
-        run: |
-          mkdir secrets
-          gpg --quiet --batch --yes --decrypt \
-            --passphrase="$gpgkey" \
-            --output secrets/key.pem key.pem.gpg
-          chmod 400 secrets/key.pem
-
-      - name: Pull Docker image on droplet
-        run: |
-          ssh -o StrictHostKeyChecking=no -i secrets/key.pem ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} \
-            'sudo docker pull muhammadolammi/jobmatch-worker:latest'
-
-      - name: Restart Docker container
-        run: |
-          ssh -o StrictHostKeyChecking=no -i secrets/key.pem ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} <<'EOF'
-          sudo docker stop worker || true
-          sudo docker rm worker || true
-          sudo docker run -d \
-            --network main \
-            --name worker \
-            -e DB_URL='${{ secrets.DB_URL }}' \
-            -e RABBITMQ_URL='${{ secrets.RABBITMQ_URL }}' \
-            -e R2_ACCCOUNT_ID='${{ secrets.R2_ACCCOUNT_ID }}' \
-            -e R2_BUCKET='${{ secrets.R2_BUCKET }}' \
-            -e R2_SECRET_KEY='${{ secrets.R2_SECRET_KEY }}' \
-            -e R2_ACCESS_KEY='${{ secrets.R2_ACCESS_KEY }}' \
-            -e GOOGLE_API_KEY='${{ secrets.GOOGLE_API_KEY }}' \
-            muhammadolammi/jobmatch-worker:latest
-          EOF
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE }}
+          region: ${{ env.REGION }}
+          project_id: ${{ env.PROJECT_ID }}
+          image: index.docker.io/${{ env.IMAGE }}:latest
+          flags: >
+            --no-allow-unauthenticated
+            --concurrency=1
+            --memory=1Gi
+          env_vars: |
+            PROJECT_ID=${{ env.PROJECT_ID }}
+            DB_URL=${{ secrets.DB_URL }}
+            RABBITMQ_URL=${{ secrets.RABBITMQ_URL }}
+            GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
+            R2_ACCOUNT_ID=${{ secrets.R2_ACCOUNT_ID }}
+            R2_BUCKET=${{ secrets.R2_BUCKET }}
+            R2_SECRET_KEY=${{ secrets.R2_SECRET_KEY }}
+            R2_ACCESS_KEY=${{ secrets.R2_ACCESS_KEY }}
