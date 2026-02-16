@@ -70,8 +70,8 @@ func startUp() *WorkerConfig {
 	ctx := context.Background()
 	go LoadAWSConfig(&workerConfig, &r2Config)
 
-	go ConnectRabbit(ctx, &workerConfig)
-	go LoadAgentRunner(&workerConfig)
+	ConnectRabbit(ctx, &workerConfig)
+	LoadAgentRunner(&workerConfig)
 	ConnectDB(ctx, &workerConfig)
 	return &workerConfig
 }
