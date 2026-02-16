@@ -322,7 +322,7 @@ func worker(workerConfig *WorkerConfig) {
 	}
 	defer client.Close()
 
-	sub := client.Subscription("resume-analysis-sub")
+	sub := client.Subscriber("resume-analysis-sub")
 
 	err = sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 
