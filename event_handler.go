@@ -67,25 +67,28 @@ func processSession(ctx context.Context, workerConfig *WorkerConfig, sessionUUID
 
 	_ = publishSessionUpdate(workerConfig.RabbitChan, session.ID.String(), update)
 }
-
 func handleEvent(w http.ResponseWriter, r *http.Request, workerConfig *WorkerConfig) {
 	ctx := r.Context()
 
-	var cloudEvent struct {
-		Data struct {
-			Message struct {
-				Data string `json:"data"`
-			} `json:"message"`
-		} `json:"data"`
+	var event struct {
+		Message struct {
+			Data string `json:"data"`
+		} `json:"message"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&cloudEvent); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
 		log.Println("Invalid event:", err)
 		http.Error(w, "invalid event", http.StatusBadRequest)
 		return
 	}
 
-	msgBytes, err := base64.StdEncoding.DecodeString(cloudEvent.Data.Message.Data)
+	if event.Message.Data == "" {
+		log.Println("Empty message data")
+		http.Error(w, "empty message data", http.StatusBadRequest)
+		return
+	}
+
+	msgBytes, err := base64.StdEncoding.DecodeString(event.Message.Data)
 	if err != nil {
 		log.Println("Base64 decode failed:", err)
 		http.Error(w, "invalid message", http.StatusBadRequest)
