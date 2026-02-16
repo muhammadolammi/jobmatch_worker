@@ -8,7 +8,6 @@ on:
 env:
   PROJECT_ID: 'n3xtbridge'
   REGION: 'us-east1'
-  SERVICE: 'jobmatch-worker'
   IMAGE: 'muhammadolammi/jobmatch-worker'
   WIF_SERVICE_ACCOUNT: 'github-deployer@n3xtbridge.iam.gserviceaccount.com'
   WIF_PROVIDER: 'projects/755404739186/locations/global/workloadIdentityPools/github/providers/my-repo'
@@ -63,7 +62,7 @@ jobs:
       - name: Deploy to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v2
         with:
-          service: ${{ env.SERVICE }}
+          
           region: ${{ env.REGION }}
           project_id: ${{ env.PROJECT_ID }}
           image: index.docker.io/${{ env.IMAGE }}:latest
@@ -72,6 +71,7 @@ jobs:
             --concurrency=1
             --memory=1Gi
             --timeout=300s
+            --job=jobmatch-worker
           env_vars: |
             PROJECT_ID=${{ env.PROJECT_ID }}
             DB_URL=${{ secrets.DB_URL }}
