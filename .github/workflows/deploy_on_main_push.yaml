@@ -24,6 +24,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+      - name: Build the server binary
+        run: |
+          chmod +x ./build.sh
+          ./build.sh
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
