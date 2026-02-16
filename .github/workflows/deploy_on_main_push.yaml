@@ -51,6 +51,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -68,6 +71,7 @@ jobs:
             --no-allow-unauthenticated
             --concurrency=1
             --memory=1Gi
+            --timeout=300s
           env_vars: |
             PROJECT_ID=${{ env.PROJECT_ID }}
             DB_URL=${{ secrets.DB_URL }}
