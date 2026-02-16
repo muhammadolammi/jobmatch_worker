@@ -11,6 +11,8 @@ env:
   SERVICE: 'jobmatch-worker'
   IMAGE: 'muhammadolammi/jobmatch-worker'
   WIF_SERVICE_ACCOUNT: 'github-deployer@n3xtbridge.iam.gserviceaccount.com'
+  WIF_PROVIDER: 'projects/755404739186/locations/global/workloadIdentityPools/github/providers/my-repo'
+
 
 permissions:
   contents: read
