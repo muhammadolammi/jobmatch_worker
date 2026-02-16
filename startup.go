@@ -68,9 +68,10 @@ func startUp() *WorkerConfig {
 		RABBITMQUrl: rabbitmqUrl,
 	}
 	ctx := context.Background()
-	LoadAWSConfig(&workerConfig, &r2Config)
+	go LoadAWSConfig(&workerConfig, &r2Config)
+
+	go ConnectRabbit(ctx, &workerConfig)
+	go LoadAgentRunner(&workerConfig)
 	ConnectDB(ctx, &workerConfig)
-	ConnectRabbit(ctx, &workerConfig)
-	LoadAgentRunner(&workerConfig)
 	return &workerConfig
 }
