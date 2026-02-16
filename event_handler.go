@@ -31,7 +31,7 @@ func processSession(ctx context.Context, workerConfig *WorkerConfig, sessionUUID
 		"timestamp":  time.Now(),
 	}
 
-	_ = publishSessionUpdate(workerConfig.RabbitConn, session.ID.String(), update)
+	_ = publishSessionUpdate(workerConfig.RabbitChan, session.ID.String(), update)
 
 	workerConfig.DB.UpdateSessionStatus(ctx, database.UpdateSessionStatusParams{
 		Status: "processing",
@@ -52,7 +52,7 @@ func processSession(ctx context.Context, workerConfig *WorkerConfig, sessionUUID
 		update["message"] = "analysis failed"
 		update["timestamp"] = time.Now()
 
-		_ = publishSessionUpdate(workerConfig.RabbitConn, session.ID.String(), update)
+		_ = publishSessionUpdate(workerConfig.RabbitChan, session.ID.String(), update)
 		return
 	}
 
@@ -65,7 +65,7 @@ func processSession(ctx context.Context, workerConfig *WorkerConfig, sessionUUID
 	update["message"] = "analysis completed"
 	update["timestamp"] = time.Now()
 
-	_ = publishSessionUpdate(workerConfig.RabbitConn, session.ID.String(), update)
+	_ = publishSessionUpdate(workerConfig.RabbitChan, session.ID.String(), update)
 }
 
 func handleEvent(w http.ResponseWriter, r *http.Request, workerConfig *WorkerConfig) {

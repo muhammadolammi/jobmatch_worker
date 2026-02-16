@@ -117,17 +117,14 @@ func lenReader(r io.ReaderAt) int64 {
 	}
 }
 
-func publishSessionUpdate(rabbitConn *amqp.Connection, sessionID string, update map[string]any) error {
-	ch, err := rabbitConn.Channel()
-	if err != nil {
-		return err
-	}
-	defer ch.Close()
+func publishSessionUpdate(rabbitChan *amqp.Channel, sessionID string, update map[string]any) error {
+
+	defer rabbitChan.Close()
 
 	body, _ := json.Marshal(update)
 	routingKey := fmt.Sprintf("session.%s", sessionID)
 
-	return ch.Publish(
+	return rabbitChan.Publish(
 		"session_updates", // exchange
 		routingKey,
 		false,

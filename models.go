@@ -19,11 +19,13 @@ type R2Config struct {
 }
 
 type WorkerConfig struct {
-	DB *database.Queries
+	DBURL string
+	DB    *database.Queries
 	// GoogleApiKey        string
-	R2                  *R2Config
-	AwsConfig           *aws.Config
-	RabbitConn          *amqp.Connection
+	R2        *R2Config
+	AwsConfig *aws.Config
+	// RabbitConn          *amqp.Connection
+	RabbitChan          *amqp.Channel
 	RABBITMQUrl         string
 	AgentRunner         *runner.Runner
 	AgentSessionService session.Service
