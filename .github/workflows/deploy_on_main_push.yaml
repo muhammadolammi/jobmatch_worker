@@ -6,7 +6,7 @@ on:
       - main
 
 env:
-  JOB: 'jobmatch-worker'
+  SERVICE: 'jobmatch-worker'
   PROJECT_ID: 'n3xtbridge'
   REGION: 'us-east1'
   IMAGE: 'muhammadolammi/jobmatch-worker'
@@ -63,7 +63,7 @@ jobs:
       - name: Deploy to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v2
         with:
-          job: ${{ env.JOB }}
+          servie: ${{ env.SERVICE }}
           region: ${{ env.REGION }}
           project_id: ${{ env.PROJECT_ID }}
           image: index.docker.io/${{ env.IMAGE }}:latest

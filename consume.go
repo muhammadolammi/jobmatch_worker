@@ -8,10 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/pubsub/v2"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 	"github.com/muhammadolammi/jobmatchworker/internal/database"
 	"google.golang.org/adk/agent"
@@ -313,111 +311,111 @@ func callAgent(currentSession Session, workerConfig *WorkerConfig) error {
 
 // }
 
-func worker(workerConfig *WorkerConfig) {
-	ctx := context.Background()
+// func worker(workerConfig *WorkerConfig) {
+// 	ctx := context.Background()
 
-	client, err := pubsub.NewClient(ctx, workerConfig.ProjectID)
-	if err != nil {
-		log.Fatalf("Failed to create pubsub client: %v", err)
-	}
-	defer client.Close()
+// 	client, err := pubsub.NewClient(ctx, workerConfig.ProjectID)
+// 	if err != nil {
+// 		log.Fatalf("Failed to create pubsub client: %v", err)
+// 	}
+// 	defer client.Close()
 
-	sub := client.Subscriber("resume-analysis-sub")
+// 	sub := client.Subscriber("resume-analysis-sub")
 
-	err = sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+// 	err = sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 
-		var payload struct {
-			SessionID string `json:"session_id"`
-		}
+// 		var payload struct {
+// 			SessionID string `json:"session_id"`
+// 		}
 
-		if err := json.Unmarshal(msg.Data, &payload); err != nil {
-			log.Println("Invalid message:", err)
-			msg.Nack()
-			return
-		}
+// 		if err := json.Unmarshal(msg.Data, &payload); err != nil {
+// 			log.Println("Invalid message:", err)
+// 			msg.Nack()
+// 			return
+// 		}
 
-		sessionUUID, err := uuid.Parse(payload.SessionID)
-		if err != nil {
-			log.Println("Invalid UUID:", err)
-			msg.Nack()
-			return
-		}
+// 		sessionUUID, err := uuid.Parse(payload.SessionID)
+// 		if err != nil {
+// 			log.Println("Invalid UUID:", err)
+// 			msg.Nack()
+// 			return
+// 		}
 
-		// Load session from DB
-		session, err := workerConfig.DB.GetSession(ctx, sessionUUID)
-		if err != nil {
-			log.Println("Session not found:", err)
-			msg.Nack()
-			return
-		}
+// 		// Load session from DB
+// 		session, err := workerConfig.DB.GetSession(ctx, sessionUUID)
+// 		if err != nil {
+// 			log.Println("Session not found:", err)
+// 			msg.Nack()
+// 			return
+// 		}
 
-		log.Println("Processing session:", session.ID)
+// 		log.Println("Processing session:", session.ID)
 
-		// 🔵 1. Send "processing" update via Rabbit
-		update := map[string]any{
-			"session_id": session.ID,
-			"status":     "processing",
-			"message":    "analysis started",
-			"timestamp":  time.Now(),
-		}
+// 		// 🔵 1. Send "processing" update via Rabbit
+// 		update := map[string]any{
+// 			"session_id": session.ID,
+// 			"status":     "processing",
+// 			"message":    "analysis started",
+// 			"timestamp":  time.Now(),
+// 		}
 
-		err = publishSessionUpdate(workerConfig.RabbitConn, session.ID.String(), update)
-		if err != nil {
-			log.Println("failed to publish update:", err)
-		}
+// 		err = publishSessionUpdate(workerConfig.RabbitConn, session.ID.String(), update)
+// 		if err != nil {
+// 			log.Println("failed to publish update:", err)
+// 		}
 
-		// Update DB
-		workerConfig.DB.UpdateSessionStatus(ctx, database.UpdateSessionStatusParams{
-			Status: "processing",
-			ID:     session.ID,
-		})
+// 		// Update DB
+// 		workerConfig.DB.UpdateSessionStatus(ctx, database.UpdateSessionStatusParams{
+// 			Status: "processing",
+// 			ID:     session.ID,
+// 		})
 
-		// 🔵 2. Run agent
-		err = callAgent(dbSessionToSession(session), workerConfig)
+// 		// 🔵 2. Run agent
+// 		err = callAgent(dbSessionToSession(session), workerConfig)
 
-		if err != nil {
-			log.Printf("Agent failed for session %s: %v", session.ID, err)
+// 		if err != nil {
+// 			log.Printf("Agent failed for session %s: %v", session.ID, err)
 
-			workerConfig.DB.UpdateSessionStatus(ctx, database.UpdateSessionStatusParams{
-				Status: "failed",
-				ID:     session.ID,
-			})
+// 			workerConfig.DB.UpdateSessionStatus(ctx, database.UpdateSessionStatusParams{
+// 				Status: "failed",
+// 				ID:     session.ID,
+// 			})
 
-			update := map[string]any{
-				"session_id": session.ID,
-				"status":     "failed",
-				"message":    "analysis failed",
-				"timestamp":  time.Now(),
-			}
+// 			update := map[string]any{
+// 				"session_id": session.ID,
+// 				"status":     "failed",
+// 				"message":    "analysis failed",
+// 				"timestamp":  time.Now(),
+// 			}
 
-			_ = publishSessionUpdate(workerConfig.RabbitConn, session.ID.String(), update)
+// 			_ = publishSessionUpdate(workerConfig.RabbitConn, session.ID.String(), update)
 
-			msg.Ack() // acknowledge even if failed (job completed logically)
-			return
-		}
+// 			msg.Ack() // acknowledge even if failed (job completed logically)
+// 			return
+// 		}
 
-		// 🔵 3. Success
-		workerConfig.DB.UpdateSessionStatus(ctx, database.UpdateSessionStatusParams{
-			Status: "completed",
-			ID:     session.ID,
-		})
+// 		// 🔵 3. Success
+// 		workerConfig.DB.UpdateSessionStatus(ctx, database.UpdateSessionStatusParams{
+// 			Status: "completed",
+// 			ID:     session.ID,
+// 		})
 
-		update = map[string]any{
-			"session_id": session.ID,
-			"status":     "completed",
-			"message":    "analysis completed",
-			"timestamp":  time.Now(),
-		}
+// 		update = map[string]any{
+// 			"session_id": session.ID,
+// 			"status":     "completed",
+// 			"message":    "analysis completed",
+// 			"timestamp":  time.Now(),
+// 		}
 
-		_ = publishSessionUpdate(workerConfig.RabbitConn, session.ID.String(), update)
+// 		_ = publishSessionUpdate(workerConfig.RabbitConn, session.ID.String(), update)
 
-		msg.Ack()
-	})
+// 		msg.Ack()
+// 	})
 
-	if err != nil {
-		log.Fatalf("Receive error: %v", err)
-	}
-}
+// 	if err != nil {
+// 		log.Fatalf("Receive error: %v", err)
+// 	}
+// }
 
 // func (workerConfig *WorkerConfig) StartConsumerWorkerPool(numWorkers int) {
 // 	var wg sync.WaitGroup
@@ -433,6 +431,6 @@ func worker(workerConfig *WorkerConfig) {
 
 // }
 
-func (workerConfig *WorkerConfig) StartWorker() {
-	worker(workerConfig)
-}
+// func (workerConfig *WorkerConfig) StartWorker() {
+// 	worker(workerConfig)
+// }

@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -111,6 +111,15 @@ func main() {
 		RabbitConn:  conn,
 	}
 
-	fmt.Println("Starting Worker ")
-	workerConfig.StartWorker()
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		handleEvent(w, r, &workerConfig)
+	})
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("Worker listening on port %s", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
