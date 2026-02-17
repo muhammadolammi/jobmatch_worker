@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -12,16 +12,16 @@ import (
 	"github.com/muhammadolammi/jobmatchworker/internal/database"
 )
 
-func processSession(ctx context.Context, workerConfig *WorkerConfig, sessionUUID uuid.UUID) {
+func processSession(ctx context.Context, workerConfig *WorkerConfig, sessionUUID uuid.UUID) error {
 	session, err := workerConfig.DB.GetSession(ctx, sessionUUID)
 	if err != nil {
 		log.Println("Session not found:", err)
-		return
+		return err
 	}
 
 	log.Println("Loaded session:", session.ID)
 	if session.Status == "completed" {
-		return
+		return nil
 	}
 
 	update := map[string]any{
@@ -53,7 +53,7 @@ func processSession(ctx context.Context, workerConfig *WorkerConfig, sessionUUID
 		update["timestamp"] = time.Now()
 
 		_ = publishSessionUpdate(workerConfig.RabbitChan, session.ID.String(), update)
-		return
+		return err
 	}
 
 	workerConfig.DB.UpdateSessionStatus(ctx, database.UpdateSessionStatusParams{
@@ -66,32 +66,36 @@ func processSession(ctx context.Context, workerConfig *WorkerConfig, sessionUUID
 	update["timestamp"] = time.Now()
 
 	_ = publishSessionUpdate(workerConfig.RabbitChan, session.ID.String(), update)
+	return nil
 }
 func handleEvent(w http.ResponseWriter, r *http.Request, workerConfig *WorkerConfig) {
 	ctx := r.Context()
 
-	var event struct {
+	wrappedMessage := struct {
 		Message struct {
-			Data string `json:"data"`
+			Data []byte `json:"data,omitempty"`
+			ID   string `json:"id"`
 		} `json:"message"`
-	}
+		Subscription string `json:"subscription"`
+	}{}
 
-	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
-		log.Println("Invalid event:", err)
-		http.Error(w, "invalid event", http.StatusBadRequest)
+	body, err := io.ReadAll(r.Body)
+	defer r.Body.Close()
+	if err != nil {
+		log.Printf("io.ReadAll: %v", err)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	// byte slice unmarshalling handles base64 decoding.
+	if err := json.Unmarshal(body, &wrappedMessage); err != nil {
+		log.Printf("json.Unmarshal: %v", err)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	if event.Message.Data == "" {
+	if wrappedMessage.Message.Data == nil {
 		log.Println("Empty message data")
 		http.Error(w, "empty message data", http.StatusBadRequest)
-		return
-	}
-
-	msgBytes, err := base64.StdEncoding.DecodeString(event.Message.Data)
-	if err != nil {
-		log.Println("Base64 decode failed:", err)
-		http.Error(w, "invalid message", http.StatusBadRequest)
 		return
 	}
 
@@ -100,7 +104,7 @@ func handleEvent(w http.ResponseWriter, r *http.Request, workerConfig *WorkerCon
 	}
 
 	var payload Payload
-	if err := json.Unmarshal(msgBytes, &payload); err != nil {
+	if err := json.Unmarshal(wrappedMessage.Message.Data, &payload); err != nil {
 		log.Println("Invalid payload:", err)
 		http.Error(w, "invalid payload", http.StatusBadRequest)
 		return
@@ -115,7 +119,12 @@ func handleEvent(w http.ResponseWriter, r *http.Request, workerConfig *WorkerCon
 
 	log.Println("Processing session:", sessionUUID)
 
-	processSession(ctx, workerConfig, sessionUUID)
+	err = processSession(ctx, workerConfig, sessionUUID)
+	if err != nil {
+		log.Println("Session Processing failed sessionId:", sessionUUID, " error:", err)
+		http.Error(w, "processing failed", http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteHeader(http.StatusOK)
 }
