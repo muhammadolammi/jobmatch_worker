@@ -43,7 +43,7 @@ func ConnectRabbit(ctx context.Context, cfg *WorkerConfig) {
 			continue
 		}
 
-		// cfg.RabbitConn = conn
+		cfg.RabbitConn = conn
 		cfg.RabbitChan = ch
 		log.Println("✅ RabbitMQ connected")
 		return

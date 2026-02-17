@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -19,12 +20,13 @@ type R2Config struct {
 }
 
 type WorkerConfig struct {
-	DBURL string
-	DB    *database.Queries
+	DBURL  string
+	DB     *database.Queries
+	DBConn *sql.DB
 	// GoogleApiKey        string
-	R2        *R2Config
-	AwsConfig *aws.Config
-	// RabbitConn          *amqp.Connection
+	R2                  *R2Config
+	AwsConfig           *aws.Config
+	RabbitConn          *amqp.Connection
 	RabbitChan          *amqp.Channel
 	RABBITMQUrl         string
 	AgentRunner         *runner.Runner
