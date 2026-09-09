@@ -21,7 +21,7 @@ func retry[T any](attempts int, fn func() (T, error)) (T, error) {
 	var zero T
 	var lastErr error
 
-	for i := 0; i < attempts; i++ {
+	for i := range attempts {
 		result, err := fn()
 		if err == nil {
 			return result, nil
@@ -78,7 +78,7 @@ func callAgent(currentSession Session, workerConfig *WorkerConfig) error {
 		SessionID: currentSession.ID.String(),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create runner: %w", err)
+		return fmt.Errorf("failed to create agent session: %w", err)
 	}
 	// process each resume
 	for _, resume := range resumes {

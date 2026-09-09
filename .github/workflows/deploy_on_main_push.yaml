@@ -1,17 +1,16 @@
 name: Build and Deploy Worker
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
 
 env:
-  SERVICE: 'jobmatch-worker'
-  PROJECT_ID: 'n3xtbridge'
-  REGION: 'us-east1'
-  IMAGE: 'muhammadolammi/jobmatch-worker'
-  
-
+  SERVICE: "jobmatch-worker"
+  PROJECT_ID: "n3xtbridge"
+  REGION: "us-east1"
+  IMAGE: "muhammadolammi/jobmatch-worker"
 
 permissions:
   contents: read
